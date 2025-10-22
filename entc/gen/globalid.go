@@ -15,6 +15,11 @@ import (
 	"entgo.io/ent/dialect/entsql"
 )
 
+const (
+	idBits = 32 << (^uint(0) >> 63) / 2 // 16 or 32
+	maxIDs = 1<<idBits - 1
+)
+
 const incrementIdent = "const IncrementStarts"
 
 // IncrementStarts holds the autoincrement start value for each type.
@@ -92,7 +97,7 @@ func IncrementStartAnnotation(g *Graph) error {
 			need = append(need, n)
 		}
 		if v, ok := r[n.Table()]; ok {
-			lastIdx = max(lastIdx, v/(1<<32-1))
+			lastIdx = max(lastIdx, v/maxIDs)
 		}
 		if err := setAnnotation(n, a); err != nil {
 			return err
@@ -100,7 +105,7 @@ func IncrementStartAnnotation(g *Graph) error {
 	}
 	// Compute new ranges and write them back to the file.
 	for i, n := range need {
-		r[n.Table()] = (lastIdx + i + 1) << 32
+		r[n.Table()] = (lastIdx + i + 1) << idBits
 		a := n.EntSQL()
 		a.IncrementStart = func(i int) *int { return &i }(r[n.Table()]) // copy to not override previous values
 		if err := setAnnotation(n, a); err != nil {
@@ -113,9 +118,10 @@ func IncrementStartAnnotation(g *Graph) error {
 		switch t1, ok := d[s]; {
 		case ok:
 			return fmt.Errorf("duplicated increment start value %d for types %s and %s", s, t1, t)
-		case s%(1<<32) != 0:
+		case s%(1<<idBits) != 0:
 			return fmt.Errorf(
-				"unexpected increment start value %d for type %s, expected multiple of %d (1<<32)", s, t, 1<<32,
+				"unexpected increment start value %d for type %s, "+
+					"expected multiple of %d (1<<%d)", s, t, 1<<idBits, idBits,
 			)
 		}
 		d[s] = t
