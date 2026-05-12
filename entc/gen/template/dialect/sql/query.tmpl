@@ -156,6 +156,7 @@ func ({{ $receiver }} *{{ $builder }}) sqlAll(ctx context.Context, hooks ...quer
 					assign := spec.Assign
 					values := spec.ScanValues
 					{{- $out := "sql.NullInt64" }}{{ if $.ID.UserDefined }}{{ $out = $.ID.ScanType }}{{ end }}
+					{{- $outAlloc := $out }}{{ if $.ID.Annotations.EntityID }}{{ $outAlloc = replace $out "EntityID" (printf `EntityID("%s")` $.ID.Annotations.EntityID.Prefix) }}{{ end }}
 					{{- $in := "sql.NullInt64" }}{{ if $e.Type.ID.UserDefined }}{{ $in = $e.Type.ID.ScanType }}{{ end }}
 					spec.ScanValues = func(columns []string) ([]any, error) {
 						values, err := values(columns[1:])
@@ -165,7 +166,7 @@ func ({{ $receiver }} *{{ $builder }}) sqlAll(ctx context.Context, hooks ...quer
 						{{- if $.ID.HasValueScanner }}
 							return append([]any{ {{ $.ID.ScanValueFunc }}() }, values...), nil
 						{{- else }}
-							return append([]any{new({{ $out }})}, values...), nil
+							return append([]any{new({{ $outAlloc }})}, values...), nil
 						{{- end }}
 					}
 					spec.Assign = func(columns []string, values []any) error {
